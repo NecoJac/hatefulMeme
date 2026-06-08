@@ -98,6 +98,7 @@ def make_loader(records, args: argparse.Namespace, shuffle: bool) -> DataLoader:
 
 @torch.no_grad()
 def collect_outputs(model, loader: DataLoader, device: torch.device) -> dict[str, torch.Tensor | list[str]]:
+    """Materialize logits/embeddings for retrieval memory and split evaluation."""
     model.eval()
     all_logits, all_embeddings, all_labels, all_ids = [], [], [], []
     for batch in loader:
@@ -116,6 +117,7 @@ def collect_outputs(model, loader: DataLoader, device: torch.device) -> dict[str
 
 
 def evaluate(model, train_loader: DataLoader, eval_loader: DataLoader, device: torch.device, args: argparse.Namespace) -> dict[str, float | None]:
+    """Evaluate both the classifier head and retrieval/RKC over train embeddings."""
     train_out = collect_outputs(model, train_loader, device)
     eval_out = collect_outputs(model, eval_loader, device)
     clf = binary_metrics(eval_out["logits"], eval_out["labels"])
@@ -150,6 +152,7 @@ def train_epoch(
 ) -> dict[str, float]:
     model.train()
     running = {"loss": 0.0, "bce": 0.0, "lcl": 0.0}
+    # Train-memory negatives/positives make LCL closer to full-database retrieval than batch-only loss.
     memory_embeddings = memory["embeddings"].to(device) if memory is not None else None
     memory_labels = memory["labels"].to(device) if memory is not None else None
     memory_ids = memory["ids"] if memory is not None else None
@@ -227,12 +230,14 @@ def main() -> None:
     print(f"[model] backend={args.encoder_backend} trainable_params={sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
     for epoch in range(1, args.epochs + 1):
+        # Refresh retrieval memory once per epoch using the current encoder/aggregator.
         train_memory = collect_outputs(model, train_eval_loader, device)
         train_stats = train_epoch(model, train_loader, optimizer, device, args, memory=train_memory)
         dev_stats = evaluate(model, train_eval_loader, dev_loader, device, args)
         row = {"epoch": epoch, **train_stats, **dev_stats}
         history.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
+        # Save separate checkpoints for the direct classifier and retrieval/RKC selection metrics.
         for metric_name, checkpoint_path in best_paths.items():
             metric_value = dev_stats.get(metric_name)
             if metric_value is None:

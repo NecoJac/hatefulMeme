@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def checkpoint_args(saved_args: dict[str, Any], cli_args: argparse.Namespace) -> argparse.Namespace:
+    """Restore training-time args while allowing evaluation batch-size overrides."""
     defaults = {
         "encoder_backend": "hash",
         "llm_model": "distilbert-base-uncased",
@@ -71,6 +72,7 @@ def checkpoint_args(saved_args: dict[str, Any], cli_args: argparse.Namespace) ->
 
 
 def make_loader(records, args: argparse.Namespace, shuffle: bool = False):
+    """Use the same collate path as training so image/cue batches match checkpoint expectations."""
     return torch.utils.data.DataLoader(
         SemanticCueDataset(records),
         batch_size=args.batch_size,
@@ -88,6 +90,7 @@ def main() -> None:
     state = torch.load(checkpoint, map_location=device)
     model_args = checkpoint_args(state.get("args", {}), args)
 
+    # Rebuild train memory because retrieval/RKC evaluation compares eval samples to train embeddings.
     records = records_from_jsonl(
         args.cues_jsonl,
         image_dir=args.image_dir,
@@ -101,6 +104,7 @@ def main() -> None:
     train_loader = make_loader(train_records, model_args)
 
     model = build_model(model_args)
+    # Sharded HF backbones already manage their own device placement; move only trainable heads.
     if model_args.encoder_backend == "hf_lora" or model_args.hf_device_map:
         model.aggregator.to(device)
         model.classifier.to(device)

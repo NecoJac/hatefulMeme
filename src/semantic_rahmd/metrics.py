@@ -4,6 +4,7 @@ import torch
 
 
 def auroc_score(scores: torch.Tensor, labels: torch.Tensor) -> float | None:
+    """Compute AUROC without sklearn so evaluation works in minimal environments."""
     scores = scores.detach().float().cpu()
     labels = labels.detach().long().cpu()
     n_pos = int((labels == 1).sum())
@@ -11,6 +12,7 @@ def auroc_score(scores: torch.Tensor, labels: torch.Tensor) -> float | None:
     if n_pos == 0 or n_neg == 0:
         return None
 
+    # Rank-based AUROC with average ranks for tied prediction scores.
     order = torch.argsort(scores)
     sorted_scores = scores[order]
     ranks = torch.zeros_like(scores)
@@ -28,6 +30,7 @@ def auroc_score(scores: torch.Tensor, labels: torch.Tensor) -> float | None:
 
 
 def binary_metrics(logits: torch.Tensor, labels: torch.Tensor) -> dict[str, float | None]:
+    """Return threshold metrics plus AUROC from raw classifier logits."""
     probs = torch.sigmoid(logits)
     preds = (probs >= 0.5).long()
     labels = labels.long()
@@ -56,6 +59,7 @@ def knn_predict(
     topk: int = 5,
     temperature: float = 0.07,
 ) -> torch.Tensor:
+    # Embeddings are normalized by the model, so dot product is cosine similarity.
     sims = query_embeddings @ train_embeddings.T
     topk = min(topk, train_embeddings.shape[0])
     scores, idx = torch.topk(sims, k=topk, dim=1)
@@ -73,6 +77,7 @@ def rkc_logits(
 ) -> torch.Tensor:
     if temperature <= 0:
         raise ValueError("temperature must be positive")
+    # Retrieval-kernel classifier: neighbors vote with signed labels weighted by similarity.
     sims = query_embeddings @ train_embeddings.T
     topk = min(topk, train_embeddings.shape[0])
     scores, idx = torch.topk(sims, k=topk, dim=1)

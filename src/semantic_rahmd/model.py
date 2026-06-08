@@ -37,6 +37,7 @@ class HashFieldEncoder(nn.Module):
 
 
 class HfFieldEncoder(nn.Module):
+    """Optional Hugging Face text encoder used for LoRA/text-only ablations."""
     def __init__(
         self,
         model_name: str,
@@ -55,6 +56,7 @@ class HfFieldEncoder(nn.Module):
         super().__init__()
         from transformers import AutoModel, AutoTokenizer
 
+        # Keep HF loading options explicit so the same class supports CPU, single-GPU, and sharded runs.
         model_kwargs: dict[str, Any] = {"trust_remote_code": trust_remote_code}
         if device_map:
             model_kwargs["device_map"] = device_map
@@ -72,6 +74,7 @@ class HfFieldEncoder(nn.Module):
                 param.requires_grad = False
 
         if use_lora:
+            # LoRA changes only small adapter matrices; the base LLM remains frozen.
             from peft import LoraConfig, get_peft_model
 
             config = LoraConfig(
@@ -107,6 +110,7 @@ class HfFieldEncoder(nn.Module):
         encoded = {key: value.to(device) for key, value in encoded.items()}
         outputs = self.backbone(**encoded)
         hidden = outputs.last_hidden_state if hasattr(outputs, "last_hidden_state") else outputs[0]
+        # Mean-pool valid tokens to obtain one vector per semantic field.
         mask = encoded["attention_mask"].unsqueeze(-1)
         pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1)
         return pooled.view(len(field_texts), len(field_texts[0]), self.hidden_size)
@@ -139,6 +143,7 @@ class SentenceTransformerFieldEncoder(nn.Module):
         self.output_dim = output_dim
         self.batch_size = batch_size
 
+        # Qwen3-VL-Embedding already returns normalized sentence/image embeddings.
         dim = self.model.get_sentence_embedding_dimension()
         if dim is None:
             dim = output_dim
@@ -179,6 +184,7 @@ class SentenceTransformerFieldImageEncoder(SentenceTransformerFieldEncoder):
             raise ValueError("st_image backend requires image_paths or images in the batch.")
 
         flat_fields = [text for item in field_texts for text in item]
+        # Encode the eight text/cue fields first; the image is appended as one extra field token.
         text_embeddings = self._encode_padded(
             flat_fields,
             prompt=self.instruction,
@@ -205,6 +211,7 @@ class SentenceTransformerFieldImageEncoder(SentenceTransformerFieldEncoder):
                 pil_images,
             )
         finally:
+            # Close PIL handles opened from paths; in-memory notebook images are harmless if already closed.
             for image in pil_images:
                 image.close()
 
@@ -221,6 +228,7 @@ class SentenceTransformerFieldImageEncoder(SentenceTransformerFieldEncoder):
         if original_len == 0:
             return torch.empty(0, self.hidden_size)
         padded_inputs = list(inputs)
+        # Some embedding backends are more stable when the final micro-batch is padded.
         remainder = original_len % self.batch_size
         if remainder:
             padded_inputs.extend([inputs[-1]] * (self.batch_size - remainder))
@@ -236,6 +244,7 @@ class SentenceTransformerFieldImageEncoder(SentenceTransformerFieldEncoder):
 
 
 class FieldAttentionAggregator(nn.Module):
+    """Fuse semantic field vectors into one meme embedding with attention pooling."""
     def __init__(
         self,
         input_dim: int,
@@ -249,6 +258,7 @@ class FieldAttentionAggregator(nn.Module):
         self.input_proj = nn.Linear(input_dim, proj_dim)
         self.use_residual_projection = use_residual_projection
         if use_residual_projection:
+            # ResProj ablation keeps a nonlinear high-dimensional path before Transformer fusion.
             self.input_residual = nn.Sequential(
                 nn.Linear(input_dim, proj_dim),
                 nn.GELU(),
@@ -274,6 +284,7 @@ class FieldAttentionAggregator(nn.Module):
         if self.use_residual_projection:
             x = self.input_norm(x + self.input_residual(fields))
         x = self.encoder(x)
+        # Attention weights are exposed for interpretability in the screencast notebook.
         weights = torch.softmax(self.attn_pool(x).squeeze(-1), dim=-1)
         pooled = torch.sum(x * weights.unsqueeze(-1), dim=1)
         return self.norm(pooled), weights
@@ -308,6 +319,7 @@ class SemanticRAHMD(nn.Module):
         image_paths: list[str | None] | None = None,
         images: list[Any | None] | None = None,
     ) -> dict[str, Any]:
+        # Field encoders may be text-only or image-aware; keep this wrapper backend-agnostic.
         if image_paths is None and images is None:
             field_vectors = self.field_encoder(field_texts)
         else:
@@ -315,6 +327,7 @@ class SemanticRAHMD(nn.Module):
                 field_vectors = self.field_encoder(field_texts, image_paths=image_paths, images=images)
             except TypeError:
                 field_vectors = self.field_encoder(field_texts)
+        # Frozen encoders may emit bf16/fp16 on another device; align before trainable layers.
         aggregator_param = next(self.aggregator.parameters())
         field_vectors = field_vectors.to(device=aggregator_param.device, dtype=aggregator_param.dtype)
         embedding, field_weights = self.aggregator(field_vectors)
@@ -327,6 +340,7 @@ class SemanticRAHMD(nn.Module):
 
 
 def build_model(args: Any) -> SemanticRAHMD:
+    """Build the requested encoder backend and the shared semantic aggregator."""
     if args.encoder_backend == "hash":
         field_encoder = HashFieldEncoder(hidden_size=args.hash_dim)
         field_dim = args.hash_dim

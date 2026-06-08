@@ -38,6 +38,7 @@ def read_semantic_cues(value: str | None) -> str:
 
 
 def load_example(args: argparse.Namespace) -> dict[str, Any]:
+    """Accept one of three inference input styles: JSON, JSONL lookup, or manual text/cues."""
     sources = [args.example_json is not None, args.cues_jsonl is not None, args.text is not None or args.semantic_cues is not None]
     if sum(sources) != 1:
         raise ValueError("Choose exactly one input source: --example-json, --cues-jsonl, or --text/--semantic-cues.")
@@ -63,6 +64,7 @@ def load_example(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def item_to_fields(item: dict[str, Any]) -> list[str]:
+    """Convert raw cue text into the ordered field list expected by the model."""
     if "fields" in item:
         fields = [str(value) for value in item["fields"]]
         if len(fields) != len(FIELD_NAMES):
@@ -76,6 +78,7 @@ def item_to_fields(item: dict[str, Any]) -> list[str]:
 
 
 def checkpoint_args(saved_args: dict[str, Any]) -> argparse.Namespace:
+    """Merge checkpoint args with defaults for backwards-compatible loading."""
     defaults = {
         "encoder_backend": "hash",
         "llm_model": "distilbert-base-uncased",
@@ -115,6 +118,7 @@ def main() -> None:
     model.load_state_dict(state["model"])
     model.eval()
 
+    # Image-aware checkpoints need a real image path in addition to semantic fields.
     image_path = args.image or item.get("image_path") or item.get("img_path") or item.get("path")
     if getattr(model_args, "encoder_backend", None) == "st_image" and not image_path:
         raise ValueError("This checkpoint uses st_image. Pass --image, or provide image_path in the example JSON.")

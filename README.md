@@ -280,6 +280,6 @@ Evaluation reports both direct classifier metrics and retrieval/RKC metrics over
 | Frozen semantic fields | 0.805 | 0.706 | 0.796 | 0.727 |
 | LoRA semantic fields | 0.807 | 0.733 | 0.747 | 0.728 |
 | Frozen fields + image | 0.827 | 0.729 | 0.806 | 0.748 |
-| ResProj1024 + RKC | **0.833** | 0.720 | **0.829** | 0.740 |
+| ResProj1024 + RKC | **0.840** | 0.731 | **0.829** | 0.740 |
 
 Main conclusion: semantic fields are useful and interpretable, but preserving the raw image improves the frozen model. The submitted final method is the frozen image + text + cues model described in the report; the other rows are kept as ablations.
