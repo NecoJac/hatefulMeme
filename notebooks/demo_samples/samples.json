@@ -1,0 +1,34 @@
+[
+  {
+    "id": "16395",
+    "split": "test_seen",
+    "label": 1,
+    "text": "handjobs sold seperately",
+    "semantic_cues": "GlobalDescription: A woman with blonde hair and braces is shown in a black top, with text overlay reading \"handjobs\" above her and \"sold separately\" below her.\nTargetCandidateType: person\nTargetCandidate: the woman in the image\nProtectedTargetPossible: no\nProtectedTargetType: none\nRelationOrAction: text overlay implying a commercial or transactional relationship\nSafetyReasonCode: only_animal_object_place",
+    "image_path": "demo_samples/test_seen_16395.png"
+  },
+  {
+    "id": "37405",
+    "split": "test_seen",
+    "label": 1,
+    "text": "introducing fidget spinner for women",
+    "semantic_cues": "GlobalDescription: A woman is visible inside a front-loading washing machine, waving with both hands, with text overlay reading \"introducing fidget spinner for women\".\nTargetCandidateType: person\nTargetCandidate: women\nProtectedTargetPossible: yes\nProtectedTargetType: sex\nRelationOrAction: woman inside washing machine waving\nSafetyReasonCode: explicit_person_group",
+    "image_path": "demo_samples/test_seen_37405.png"
+  },
+  {
+    "id": "70691",
+    "split": "test_seen",
+    "label": 0,
+    "text": "overdose",
+    "semantic_cues": "GlobalDescription: The image shows sliced watermelon with the word \"overdose\" superimposed.\nTargetCandidateType: none\nTargetCandidate: none\nProtectedTargetPossible: no\nProtectedTargetType: none\nRelationOrAction: none\nSafetyReasonCode: only_animal_object_place",
+    "image_path": "demo_samples/test_seen_70691.png"
+  },
+  {
+    "id": "89263",
+    "split": "test_seen",
+    "label": 0,
+    "text": "my ex looks so peaceful when he sleeps",
+    "semantic_cues": "GlobalDescription: A pile of black trash bags on a sidewalk is juxtaposed with text stating \"my ex looks so peaceful when he sleeps.\"\nTargetCandidateType: person\nTargetCandidate: ex\nProtectedTargetPossible: yes\nProtectedTargetType: none\nRelationOrAction: comparison\nSafetyReasonCode: explicit_person_group",
+    "image_path": "demo_samples/test_seen_89263.png"
+  }
+]

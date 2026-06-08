@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Large or generated artifacts
+data/*
+!data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+checkpoints/
+logs/
+wandb/
+runs/
+vendor/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.npz
+*.jsonl
+!examples/*.jsonl
+
+# Report build artifacts
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.out
+*.synctex.gz
+
+# OS/editor
+.DS_Store
+.vscode/
